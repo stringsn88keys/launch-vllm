@@ -29,7 +29,8 @@ line adding `torch\lib` to `PATH` for the pattern — add `cuda-shim/bin` the sa
 ## 2. Set your Hugging Face token
 
 Models are pulled from the Hugging Face Hub on first run and cached locally (`~/.cache/huggingface`).
-Gated/private models need a token.
+Gated/private models need a token. Not sure which model fits your GPU? Use llmfit to check a model
+against your hardware before downloading it.
 
 ```bash
 cp .env.example .env
@@ -96,3 +97,69 @@ resp = client.chat.completions.create(
 
 **Claude Agent SDK / other agent frameworks** — most support a custom OpenAI-compatible base URL;
 set it to `http://<host>:8000/v1` and supply the same API key.
+
+**GitHub Copilot / VS Code** — Command Palette → `Chat: Manage Language Models` → `OpenAI Compatible`
+→ paste base URL (`http://localhost:8000/v1`), API key, and model ID → `Add Model`. Shows up in the
+Copilot Chat model picker. (VS Code Insiders as of writing.)
+
+**OpenAI Codex CLI** — add a custom provider in `~/.codex/config.toml`:
+
+```toml
+model = "org/some-model"
+model_provider = "vllm"
+
+[model_providers.vllm]
+name = "local vLLM"
+base_url = "http://localhost:8000/v1"
+wire_api = "chat"       # vLLM speaks Chat Completions, not the Responses API
+env_key = "VLLM_API_KEY"
+```
+
+```bash
+export VLLM_API_KEY=secret   # any value works if you didn't launch with -ApiKey
+```
+
+**Aider**
+
+```bash
+export OPENAI_API_BASE=http://localhost:8000/v1
+export OPENAI_API_KEY=secret
+aider --model openai/org/some-model   # openai/ prefix required
+```
+
+**opencode** — add a custom provider to `opencode.json`:
+
+```json
+{
+  "provider": {
+    "vllm": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "local vLLM",
+      "options": { "baseURL": "http://localhost:8000/v1" },
+      "models": { "org/some-model": {} }
+    }
+  }
+}
+```
+
+**Claude Code / Claude Desktop** — Claude Code always runs on Claude itself (Anthropic API / Bedrock /
+Vertex / Claude Platform on AWS); there's no setting to swap its backend for an OpenAI-compatible
+endpoint. To let Claude call your local model as a *tool* instead, bridge it through MCP
+([`@felores/multichat-mcp-server`](https://github.com/felores/multichat-mcp-server)) in `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "local-vllm": {
+      "command": "npx",
+      "args": ["-y", "@felores/multichat-mcp-server"],
+      "env": {
+        "AI_CHAT_NAME": "Local vLLM",
+        "AI_CHAT_BASE_URL": "http://localhost:8000/v1",
+        "AI_CHAT_KEY": "secret",
+        "AI_CHAT_MODEL": "org/some-model"
+      }
+    }
+  }
+}
+```
